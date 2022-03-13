@@ -1,0 +1,91 @@
+---
+title: "Length to age"
+author: Darcy Webber
+date: 13 March 2022
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{New Zealand Spatial Features}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+The `length2age` package make use of `brms`.
+
+There are two sub models: modelling the distribution of lengths for each age; and given a vector of lengths, return an age composition.
+
+```{r echo=TRUE}
+library(dplyr)
+library(ggplot2)
+library(brms)
+
+theme_set(theme_bw())
+
+options(mc.cores = 6)
+```
+
+First we simulate some data
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+n_age <- 5
+
+# Define the distribution of length for each age ----
+mu_length <- seq(3, 10, length.out = n_age)
+sd_length <- rep(0.8, n_age)
+
+# For each age, the number of samples for which we will simulate observations of age and length ----
+n_samples <- c(200, 400, 400, 600, 400)
+
+# Simulate a paired age-length data set ----
+age_sims <- NULL
+length_sims <- NULL
+
+for (i in 1:n_age) {
+  n <- n_samples[i]
+  age_sims <- c(age_sims, rep(i, n))
+  # x <- rlnorm(n = n, meanlog = log(mu_length[i]), sdlog = sd_length[i])
+  x <- rnorm(n = n, mean = mu_length[i], sd = sd_length[i])
+  length_sims <- c(length_sims, x)
+}
+
+data <- data.frame(age = factor(age_sims), length = length_sims)
+
+ggplot(data = data) +
+  geom_histogram(aes(x = length, fill = age))
+
+# Fit brms models ----
+
+# First model length and age, specifiy a different sigma for each age
+fit1 <- brm(bf(length ~ age, sigma ~ age), 
+            data = data, 
+            family = gaussian())
+
+# Then we would take the estimates from this and feed them into the mixture model
+fit2 <- brm(bf(length ~ 1, 
+               mu1 = 3, mu2 = 4.75, mu3 = 6.5, mu4 = 8.25, mu5 = 10,
+               sigma1 = 0.8, sigma2 = 0.8, sigma3 = 0.8, sigma4 = 0.8, sigma5 = 0.8), 
+            data = data, 
+            family = mixture(gaussian, nmix = n_age))
+
+# If my theory is correct, then the simplex of theta's should be the same as the proportions at age
+summary(fit2)
+prop <- n_samples / sum(n_samples)
+propr
+
+# Do a hypothesis test ----
+hyp <- c("theta1 = 0.1", "theta2 = 0.2", "theta3 = 0.2", "theta4 = 0.3", "theta5 = 0.2")
+test <- hypothesis(x = fit2, hypothesis = hyp, class = NULL)
+test
+plot(test)
+```
