@@ -1,0 +1,203 @@
+---
+title: "Length to age"
+author: Darcy Webber
+date: 13 March 2022
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{New Zealand Spatial Features}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+The `length2age` package makes use of `brms`. The package is designed to convert a length composition to an age composition, provided that there is some paired age-length data.
+
+```{r echo=TRUE}
+library(dplyr)
+library(ggplot2)
+library(brms)
+library(stringr)
+library(readr)
+library(reshape2)
+library(patchwork)
+
+theme_set(theme_bw())
+
+options(mc.cores = 6)
+
+criterion <- c("loo")
+```
+
+First we import some data
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+load("data/Darcy_HAK.ALK.data.SOP.otoliths.rdata")
+# load("data/Darcy_HAK.ALK.data.ALL.otoliths.rdata")
+
+table(data2$age)
+table(data2$area)
+table(data2$YCS)
+table(data2$fyear)
+table(data2$origin)
+
+d <- data2 %>%
+  ungroup() %>%
+  # filter(fyear %in% 2000:2010) %>%
+  mutate(age = ordered(floor(age)), cyear = fyear, fyear = as.factor(fyear), month = as.factor(month))
+
+glimpse(d)
+table(d$age)
+
+fit_0c <- brm(age ~ length, data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+fit_1c <- brm(age ~ s(length), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+fit_2c <- brm(age ~ s(length, k = 3), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+fit_2cv <- brm(bf(age ~ s(length, k = 3)) + lf(disc ~ length), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+fit_2r <- brm(age ~ s(length, k = 3), data = d, family = cratio("logit"), control = list(adapt_delta = 0.99))
+fit_2s <- brm(age ~ s(length, k = 3), data = d, family = sratio("logit"), control = list(adapt_delta = 0.99))
+
+# fit_ord1 <- brm(age ~ s(length), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord1a <- brm(age ~ s(length, bs = "cr"), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord2 <- brm(age ~ t2(length), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord2a <- brm(age ~ t2(length, bs = "ts"), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord4 <- brm(age ~ s(length, k = 3), data = d, family = cumulative("logit", threshold = "flexible"), control = list(adapt_delta = 0.99))
+# fit_ord5 <- brm(age ~ s(length, k = 3, by = fyear), data = d, family = cumulative("logit", threshold = "flexible"), control = list(adapt_delta = 0.95))
+# fit_ord6 <- brm(age ~ t2(length, cyear), data = d, family = cumulative("logit", threshold = "flexible"), control = list(adapt_delta = 0.95))
+# fit_ord7 <- brm(age ~ s(length, k = 3, by = fyear) + month + s(lat, long), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord8 <- brm(age ~ s(length, k = 3, by = fyear) + month + t2(lat, long), data = d, family = cumulative("logit", threshold = "flexible"))
+# fit_ord9 <- brm(age ~ s(length, k = 3, by = fyear), data = d, family = cumulative("probit", threshold = "flexible"), control = list(adapt_delta = 0.95))
+# NEXT MODELs SHOULD HAVE AUTOCORRELATION THRU TIME TO INFER MISSING DATA FROM YEAR TO YEAR
+# t2(length, cyear, k = c(3, 26)) - cratio and sratio
+# do time as fyear + fmonth / 12
+# space as the clusters (could have sub clusters within bigger fisheries)
+
+fit_ord0 <- add_criterion(fit_ord0, criterion = criterion)
+fit_ord1 <- add_criterion(fit_ord1, criterion = criterion)
+fit_ord1a <- add_criterion(fit_ord1a, criterion = criterion)
+fit_ord2 <- add_criterion(fit_ord2, criterion = criterion)
+fit_ord2a <- add_criterion(fit_ord2a, criterion = criterion)
+# fit_ord3 <- add_criterion(fit_ord3, criterion = criterion)
+fit_ord4 <- add_criterion(fit_ord4, criterion = criterion)
+fit_ord5 <- add_criterion(fit_ord5, criterion = criterion)
+fit_ord6 <- add_criterion(fit_ord6, criterion = criterion)
+fit_ord7 <- add_criterion(fit_ord7, criterion = criterion)
+
+fit_1c <- add_criterion(fit_1c, criterion = criterion)
+fit_1r <- add_criterion(fit_1r, criterion = criterion)
+fit_1s <- add_criterion(fit_1s, criterion = criterion)
+fit_1cv <- add_criterion(fit_1cv, criterion = criterion)
+
+save(#fit_ord1, fit_ord2, fit_ord3, fit_ord4, fit_ord5, fit_ord6,
+     fit_ord4, fit_ord5, fit_ord6, fit_ord7,
+     file = "fit_ord.rda")
+load("fit_ord.rda")
+
+loo_compare(fit_1c, fit_1r, fit_1s, fit_1cv)
+
+loo_compare(fit_ord0, fit_ord1, fit_ord1a, fit_ord2, fit_ord4, fit_ord5, fit_ord6, fit_ord7)
+
+fit <- fit_1cc
+conditional_smooths(x = fit, resolution = 100)
+conditional_effects(x = fit, effects = "length", categorical = TRUE)
+conditional_effects(x = fit, effects = "disc_length")
+pp_check(object = fit, type = "bars", ndraws = 100) + labs(x = "Age")
+pp_check(object = fit, type = "ecdf_overlay", ndraws = 100) + labs(x = "Age")
+
+p1 <- pp_check(object = fit_1c, type = "ecdf_overlay", ndraws = 100) + labs(x = "Age")
+p2 <- pp_check(object = fit_1cv, type = "ecdf_overlay", ndraws = 100) + labs(x = "Age")
+p3 <- pp_check(object = fit_1r, type = "ecdf_overlay", ndraws = 100) + labs(x = "Age")
+p4 <- pp_check(object = fit_1s, type = "ecdf_overlay", ndraws = 100) + labs(x = "Age")
+p1 + p2 + p3 + p3
+
+newdata <- data_lf %>% select(-age)
+head(newdata)
+dim(newdata)
+
+fit <- fit_ord4
+# ppred <- fitted(object = fit_ord, newdata = newdata, summary = TRUE)
+ppred <- predict(object = fit, newdata = newdata, summary = TRUE)
+# ppred <- posterior_epred(object = fit_ord, newdata = newdata, summary = TRUE)
+head(ppred)
+dim(ppred)
+
+df <- data.frame(age = 1:n_age, pred =  colSums(ppred))
+
+ggplot(data = data_lf) +
+  geom_histogram(aes(x = age), binwidth = 1, fill = "lightblue", colour = "black") +
+  geom_point(data = df, aes(x = age, y = pred), colour = "red")
+```
+
+
+
+
+
+
+
+
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+# Fit brms models ----
+
+# First model length and age, specifiy a different sigma for each age
+fit1 <- brm(bf(length ~ age, sigma ~ age), 
+            data = data, 
+            family = gaussian())
+
+conditional_effects(x = fit1)
+
+# Then we would take the estimates from this and feed them into the mixture model - this could be done by fixing values below or specifying priors
+mix <- mixture(gaussian, nmix = n_age, order = TRUE)
+
+formula1 <- bf(length ~ 1)
+
+# Fixing values
+pfix <- list()
+pfix[1:(n_age*2)] <- c(mu_length, sd_length)
+names(pfix) <- c(paste0("mu", 1:n_age), paste0("sigma", 1:n_age))
+formula2 <- formula1
+formula2$pfix <- pfix
+
+# Specifying priors
+priors <- get_prior(formula = formula1, data = data, family = mix)
+sigma_pos <- str_detect(priors$class, "sigma")
+sigma_names <- priors[sigma_pos, "class"]
+sigma_age <- parse_number(sigma_names)
+sigma_order <- match(paste0("sigma", sort(sigma_age)), priors$class)
+priors$prior[sigma_order] <- paste0("normal(", mu_length, ", ", sd_length, ")")
+
+# priors <- c(prior(normal(3, 0.01), class = "Intercept", dpar = "mu1"),
+#             prior(normal(4.75, 0.01), class = "Intercept", dpar = "mu2"),
+#             prior(normal(6.5, 0.01), class = "Intercept", dpar = "mu3"),
+#             prior(normal(8.25, 0.01), class = "Intercept", dpar = "mu4"),
+#             prior(normal(10, 0.01), class = "Intercept", dpar = "mu5"),
+#             prior(normal(0.8, 0.01), class = "sigma1"),
+#             prior(normal(0.8, 0.01), class = "sigma2"),
+#             prior(normal(0.8, 0.01), class = "sigma3"),
+#             prior(normal(0.8, 0.01), class = "sigma4"),
+#             prior(normal(0.8, 0.01), class = "sigma5"),
+#             prior(dirichlet(1), class = "theta"))
+
+fit2_p <- brm(formula = formula1, data = data, prior = priors, family = mix, sample_prior = "yes")
+fit2_f <- brm(formula = formula2, data = data, family = mix)
+
+# If my theory is correct, then the simplex of theta's should be the same as the proportions at age
+summary(fit2a)
+prop <- n_samples / sum(n_samples)
+prop
+
+# Do a hypothesis test ----
+hyp <- paste0("theta", 1:n_age, " = ", prop)
+test <- hypothesis(x = fit2a, hypothesis = hyp, class = NULL)
+test
+plot(test)
+```
