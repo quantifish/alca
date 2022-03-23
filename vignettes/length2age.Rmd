@@ -30,6 +30,10 @@ library(brms)
 library(stringr)
 library(readr)
 library(reshape2)
+library(conflicted)
+
+conflict_prefer("select", "dplyr")
+conflict_prefer("filter", "dplyr")
 
 theme_set(theme_bw())
 
