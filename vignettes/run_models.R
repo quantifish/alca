@@ -34,6 +34,7 @@ d <- data2 %>%
   mutate(age = ordered(floor(age)), cyear = fyear, fyear = as.factor(fyear), month = as.factor(month))
 
 glimpse(d)
+dim(d)
 
 table(data2$age)
 table(data2$area)
@@ -42,10 +43,30 @@ table(data2$fmonth)
 table(data2$month)
 table(data2$origin)
 
+# In this version the idea is to provide counts of each length for an age, and these use these counts as weights in the model. Can speed things up. Will not work for spatial models.
+d2 <- d %>%
+  group_by(fyear, month, age, length) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(cyear = as.numeric(as.character(fyear)))
+
+glimpse(d2)
+nrow(d)
+nrow(d2) # reduces data set by about half
+
+# do a benchmark on these two runs
+
+fast_0 <- brm(age ~ s(length, cyear, k = c(3, 26)) + month, data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+fast_1 <- brm(age | weights(count) ~ s(length, cyear, k = c(3, 26)) + month, data = d2, family = cumulative("logit"), control = list(adapt_delta = 0.99))
+
 # Full models ----
 
 if (do_run1) {
   # WHEN DOING THIS AGAIN SHOULD DO s(long, lat) and should really turn into equal area then spec the same k in x and y
+  # Should try models with error in age and/or length e.g.: 
+  # age | mi(age_sd) ~ s(length, k = 3)
+  # age | mi(age_sd) ~ s(me(length, length_sd), k = 3)
+  # age | mi(age_sd) ~ s(me(length, 1), k = 3)
   full_1c <- brm(age ~ s(length, cyear, k = c(3, 26)) + origin + month + s(lat, long), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
   full_2c <- brm(age ~ t2(length, cyear, k = c(3, 26)) + origin + month + t2(lat, long), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
   full_3c <- brm(age ~ s(length, cyear, k = c(3, 26)) + origin + month + t2(lat, long), data = d, family = cumulative("logit"), control = list(adapt_delta = 0.99))
