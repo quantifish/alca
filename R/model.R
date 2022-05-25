@@ -7,6 +7,7 @@
 #' @return a \code{data.frame} with the data appended as a matrix.
 #' 
 #' @import dplyr
+#' @importFrom tidyr pivot_wider
 #' @export
 #' 
 data_to_wide <- function(x, names_from = "length", values_from = "count", sum_to_one = FALSE, ...) {
@@ -77,6 +78,7 @@ aggregate_lf_tails <- function(M, lb = 1, ub) {
 #' @return a \code{function} containing initial values.
 #' 
 #' @import dplyr
+#' @importFrom nlme fixef
 #' @export
 #' 
 get_init <- function(fit) {
@@ -87,13 +89,3 @@ get_init <- function(fit) {
   init_fun <- function() init
   return(init_fun)
 }
-
-
-#' Default priors.
-#' 
-#' @return a \code{brmsprior} \code{data.frame}.
-#' 
-#' @importFrom brms prior
-#' @export
-#' 
-default_priors <- c(prior(normal(0, 10), class = "Intercept"), prior(normal(0, 1), class = "b"))

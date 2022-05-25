@@ -1,0 +1,40 @@
+Package: alca
+Title: Age and length composition analysis
+Version: 0.0.0
+Authors@R: 
+    person(given = "Darcy",
+           family = "Webber",
+           role = c("aut", "cre"),
+           email = "darcy.webber@quantifish.co.nz")
+Description: The alca package has been developed for use with brms.
+URL: https://github.com/quantifish/influ2
+BugReports: https://github.com/quantifish/influ2/issues
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 3.5.0),
+    dplyr,
+    tidyr,
+    ggplot2,
+    patchwork
+Imports:
+    reshape2,
+    tidyselect,
+    stringr,
+    stringi,
+    readr,
+    nlme,
+    brms
+Suggests: 
+    knitr,
+    tidyverse,
+    devtools,
+    rmarkdown,
+    roxygen2,
+    testthat,
+    usethis,
+    viridis,
+    bayesplot
+LazyData: false
+VignetteBuilder: knitr
+RoxygenNote: 7.2.0

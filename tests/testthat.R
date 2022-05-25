@@ -1,2 +1,2 @@
 library(testthat)
-test_check("nzsf")
+test_check("alca")
