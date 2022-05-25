@@ -1,0 +1,200 @@
+---
+title: "Length to age"
+author: Darcy Webber
+date: 13 March 2022
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{New Zealand Spatial Features}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+The `length2age` package makes use of `brms`.
+
+There are two sub models: modelling the distribution of lengths for each age; and given a vector of lengths, return an age composition.
+
+```{r echo=TRUE}
+library(dplyr)
+library(ggplot2)
+library(brms)
+library(stringr)
+library(readr)
+library(reshape2)
+
+theme_set(theme_bw())
+
+options(mc.cores = 6)
+
+criterion <- c("loo")
+```
+
+First we simulate some data
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+n_age <- 20
+n_sims <- 2000
+n_samples <- 1000 # the number of aged individuals
+
+# Define the distribution of length for each age ----
+von_bertalanffy <- function(age, Linf, k, t0) {
+  length <- Linf * (1.0 - exp(-k * (age - t0)))
+  return(length)
+}
+
+mu_length <- von_bertalanffy(age = 1:n_age, Linf = 100, k = 0.5, t0 = -0.5)
+cv_length <- rep(0.05, n_age)
+sd_length <- cv_length * mu_length
+
+ggplot(data = data.frame(age = 1:n_age, length = mu_length, sd = sd_length), aes(x = age, y = length)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = length - sd, ymax = length + sd))
+```
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+# Simulate a paired age-length data set ----
+count <- c(1, 1, 7, 40, 60, 50, 30, 40, 12, 10, 9, 10, 2, 2, 1, 1, 4, 3, 1, 1)
+prob <- count / sum(count)
+df <- data.frame(age = 1:n_age, count = rmultinom(n = 1, size = n_sims, prob = prob))
+age_sims <- rep(df$age, df$count)
+
+length_sims <- sapply(age_sims, function(x) rnorm(1, mean = mu_length[x], sd = sd_length[x]))
+
+data <- data.frame(age = as.integer(age_sims), length = length_sims)
+
+i <- sample(x = 1:nrow(data), size = n_samples)
+data_age <- data[i,]
+data_lf <- data[-i,]
+
+ggplot(data = data_age) +
+  geom_bar(aes(x = age, stat = "count"))
+
+ggplot(data = data_lf) +
+  geom_histogram(aes(x = length, fill = factor(age)))
+```
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+glimpse(data_age)
+d <- data_age %>%
+  mutate(age = ordered(age))
+glimpse(d)
+
+fit_ord1 <- brm(age ~ length, data = d, family = cumulative("logit", threshold = "flexible"))
+fit_ord2 <- brm(age ~ s(length), data = d, family = cumulative("logit", threshold = "flexible"))
+fit_ord3 <- brm(age ~ t2(length), data = d, family = cumulative("logit", threshold = "flexible"))
+fit_ord4 <- brm(age ~ s(length, k = 3), data = d, family = cumulative("logit", threshold = "flexible"))
+fit_ord5 <- brm(age ~ s(length, bs = "cr"), data = d, family = cumulative("logit", threshold = "flexible"))
+fit_ord6 <- brm(age ~ t2(length, bs = "ts"), data = d, family = cumulative("logit", threshold = "flexible"))
+
+fit_ord1 <- add_criterion(fit_ord1, criterion = criterion)
+fit_ord2 <- add_criterion(fit_ord2, criterion = criterion)
+fit_ord3 <- add_criterion(fit_ord3, criterion = criterion)
+fit_ord4 <- add_criterion(fit_ord4, criterion = criterion)
+fit_ord5 <- add_criterion(fit_ord5, criterion = criterion)
+fit_ord6 <- add_criterion(fit_ord6, criterion = criterion)
+
+save(fit_ord1, fit_ord2, fit_ord3, fit_ord4, fit_ord5, fit_ord6,
+     file = "fit_ord.rda")
+load("fit_ord.rda")
+
+loo_compare(fit_ord1, fit_ord2, fit_ord3, fit_ord4, fit_ord5, fit_ord6)
+
+conditional_smooths(x = fit_ord4)
+conditional_smooths(x = fit_ord2)
+conditional_smooths(x = fit_ord5)
+conditional_smooths(x = fit_ord6)
+
+conditional_effects(x = fit_ord1, effects = "length", categorical = TRUE)
+conditional_effects(x = fit_ord4, effects = "length", categorical = TRUE)
+
+pp_check(object = fit_ord2, type = "bars", ndraws = 100) + labs(x = "Age")
+pp_check(object = fit_ord3, type = "bars", ndraws = 100) + labs(x = "Age")
+pp_check(object = fit_ord1, type = "bars", ndraws = 100) + labs(x = "Age")
+
+pp_check(fit_ord2, type = "ecdf_overlay", ndraws = 100)
+
+newdata <- data_lf %>% select(-age)
+head(newdata)
+dim(newdata)
+
+fit <- fit_ord4
+# ppred <- fitted(object = fit_ord, newdata = newdata, summary = TRUE)
+ppred <- predict(object = fit, newdata = newdata, summary = TRUE)
+# ppred <- posterior_epred(object = fit_ord, newdata = newdata, summary = TRUE)
+head(ppred)
+dim(ppred)
+
+df <- data.frame(age = 1:n_age, pred =  colSums(ppred))
+
+ggplot(data = data_lf) +
+  geom_histogram(aes(x = age), binwidth = 1, fill = "lightblue", colour = "black") +
+  geom_point(data = df, aes(x = age, y = pred))
+```
+
+```{r echo=TRUE, fig.height=6, fig.width=9, message=FALSE}
+# Fit brms models ----
+
+# First model length and age, specifiy a different sigma for each age
+fit1 <- brm(bf(length ~ age, sigma ~ age), 
+            data = data, 
+            family = gaussian())
+
+conditional_effects(x = fit1)
+
+# Then we would take the estimates from this and feed them into the mixture model - this could be done by fixing values below or specifying priors
+mix <- mixture(gaussian, nmix = n_age, order = TRUE)
+
+formula1 <- bf(length ~ 1)
+
+# Fixing values
+pfix <- list()
+pfix[1:(n_age*2)] <- c(mu_length, sd_length)
+names(pfix) <- c(paste0("mu", 1:n_age), paste0("sigma", 1:n_age))
+formula2 <- formula1
+formula2$pfix <- pfix
+
+# Specifying priors
+priors <- get_prior(formula = formula1, data = data, family = mix)
+sigma_pos <- str_detect(priors$class, "sigma")
+sigma_names <- priors[sigma_pos, "class"]
+sigma_age <- parse_number(sigma_names)
+sigma_order <- match(paste0("sigma", sort(sigma_age)), priors$class)
+priors$prior[sigma_order] <- paste0("normal(", mu_length, ", ", sd_length, ")")
+
+# priors <- c(prior(normal(3, 0.01), class = "Intercept", dpar = "mu1"),
+#             prior(normal(4.75, 0.01), class = "Intercept", dpar = "mu2"),
+#             prior(normal(6.5, 0.01), class = "Intercept", dpar = "mu3"),
+#             prior(normal(8.25, 0.01), class = "Intercept", dpar = "mu4"),
+#             prior(normal(10, 0.01), class = "Intercept", dpar = "mu5"),
+#             prior(normal(0.8, 0.01), class = "sigma1"),
+#             prior(normal(0.8, 0.01), class = "sigma2"),
+#             prior(normal(0.8, 0.01), class = "sigma3"),
+#             prior(normal(0.8, 0.01), class = "sigma4"),
+#             prior(normal(0.8, 0.01), class = "sigma5"),
+#             prior(dirichlet(1), class = "theta"))
+
+fit2_p <- brm(formula = formula1, data = data, prior = priors, family = mix, sample_prior = "yes")
+fit2_f <- brm(formula = formula2, data = data, family = mix)
+
+# If my theory is correct, then the simplex of theta's should be the same as the proportions at age
+summary(fit2a)
+prop <- n_samples / sum(n_samples)
+prop
+
+# Do a hypothesis test ----
+hyp <- paste0("theta", 1:n_age, " = ", prop)
+test <- hypothesis(x = fit2a, hypothesis = hyp, class = NULL)
+test
+plot(test)
+```
