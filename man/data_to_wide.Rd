@@ -8,21 +8,23 @@ data_to_wide(
   x,
   names_from = "length",
   values_from = "count",
-  sum_to_one = FALSE,
-  ...
+  levels = NULL,
+  sum_to_one = FALSE
 )
 }
 \arguments{
-\item{x}{The \code{data.frame} to .}
+\item{x}{A \code{data.frame}.}
 
-\item{names_from}{The coordinate reference system to use: integer with the EPSG code, or character with \code{proj4string}.}
+\item{names_from}{The column name to change to wide format.}
 
-\item{values_from}{Other arguments passed on to \code{coord_sf}.}
+\item{values_from}{The values to change to wide format.}
 
-\item{...}{Other arguments passed on to \code{coord_sf}.}
+\item{levels}{The factor levels if wanting to pad missing values with zeros.}
+
+\item{sum_to_one}{Force the data in each row to sum to one.}
 }
 \value{
-a \code{data.frame} with the data appended as a matrix.
+a \code{data.frame} with the data in wide format appended as a matrix.
 }
 \description{
 Data to wide.

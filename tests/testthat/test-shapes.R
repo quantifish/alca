@@ -1,7 +1,9 @@
 context("Dimensions of shapes")
 
-test_that("number of QMAs", {
+test_that("matrix manipulation", {
   
-  # expect_equal(nrow(get_qma("COC")), 13)
+  M <- matrix(runif(n = 5 * 10), nrow = 5, ncol = 10)
+  
+  expect_equal(rowSums(M), rowSums(aggregate_composition_tails(M, lb = 3, ub = 7)))
   
 })

@@ -15,8 +15,7 @@ Depends:
     R (>= 3.5.0),
     dplyr,
     tidyr,
-    ggplot2,
-    patchwork
+    ggplot2
 Imports:
     reshape2,
     tidyselect,

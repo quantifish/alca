@@ -1,19 +1,26 @@
 #' Data to wide.
 #' 
-#' @param x The \code{data.frame} to .
-#' @param names_from The coordinate reference system to use: integer with the EPSG code, or character with \code{proj4string}.
-#' @param values_from Other arguments passed on to \code{coord_sf}.
-#' @param ... Other arguments passed on to \code{coord_sf}.
-#' @return a \code{data.frame} with the data appended as a matrix.
+#' @param x A \code{data.frame}.
+#' @param names_from The column name to change to wide format.
+#' @param values_from The values to change to wide format.
+#' @param levels The factor levels if wanting to pad missing values with zeros.
+#' @param sum_to_one Force the data in each row to sum to one.
+#' @return a \code{data.frame} with the data in wide format appended as a matrix.
 #' 
 #' @import dplyr
 #' @importFrom tidyr pivot_wider
 #' @export
 #' 
-data_to_wide <- function(x, names_from = "length", values_from = "count", sum_to_one = FALSE, ...) {
+data_to_wide <- function(x, names_from = "length", values_from = "count", 
+                         levels = NULL, sum_to_one = FALSE) {
+  
+  if (!is.null(levels)) {
+    x[,names_from] <- factor(x[,names_from], levels = levels)
+  }
   
   df_wide <- x %>%
-    pivot_wider(names_from = names_from, values_from = values_from, names_sort = TRUE, names_prefix = "A.", values_fill = 0, ...)
+    pivot_wider(names_from = names_from, values_from = values_from, 
+                names_expand = TRUE, names_sort = TRUE, names_prefix = "A.", values_fill = 0)
   
   Y <- df_wide %>% 
     select(all_of(starts_with("A."))) %>% 
@@ -33,7 +40,7 @@ data_to_wide <- function(x, names_from = "length", values_from = "count", sum_to
 
 #' Find the midpoints of a vector of bins
 #' 
-#' @param fit The \code{brms} model fit.
+#' @param x The \code{brms} model fit.
 #' @return a \code{function} containing initial values.
 #' 
 #' @importFrom stringr str_sub str_extract
@@ -46,12 +53,14 @@ cut_midpoint <- function(x) {
 
 #' Aggregate the tails of a matrix
 #' 
-#' @param fit The \code{brms} model fit.
-#' @return a \code{function} containing initial values.
+#' @param M A \code{matrix}.
+#' @param lb The row of the matrix to aggregate into.
+#' @param ub The row of the matrix to aggregate into.
+#' @return A \code{matrix}.
 #' 
 #' @export
 #' 
-aggregate_lf_tails <- function(M, lb = 1, ub) {
+aggregate_composition_tails <- function(M, lb = 1, ub) {
   if (lb > 1) {
     m1 <- rowSums(M[,1:lb])
   } else {
