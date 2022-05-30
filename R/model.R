@@ -15,7 +15,7 @@ data_to_wide <- function(x, names_from = "length", values_from = "count",
                          levels = NULL, sum_to_one = FALSE) {
   
   if (!is.null(levels)) {
-    x[,names_from] <- factor(x[,names_from], levels = levels)
+    x[[names_from]] <- factor(x[[names_from]], levels = levels)
   }
   
   df_wide <- x %>%

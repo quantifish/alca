@@ -7,7 +7,7 @@
 cut_midpoint(x)
 }
 \arguments{
-\item{fit}{The \code{brms} model fit.}
+\item{x}{The \code{brms} model fit.}
 }
 \value{
 a \code{function} containing initial values.

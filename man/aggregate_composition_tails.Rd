@@ -7,10 +7,14 @@
 aggregate_composition_tails(M, lb = 1, ub)
 }
 \arguments{
-\item{fit}{The \code{brms} model fit.}
+\item{M}{A \code{matrix}.}
+
+\item{lb}{The row of the matrix to aggregate into.}
+
+\item{ub}{The row of the matrix to aggregate into.}
 }
 \value{
-a \code{function} containing initial values.
+A \code{matrix}.
 }
 \description{
 Aggregate the tails of a matrix
