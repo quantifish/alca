@@ -51,6 +51,28 @@ cut_midpoint <- function(x) {
 }
 
 
+#' Logit function
+#' 
+#' @param x The \code{brms} model fit.
+#' @return a \code{function} containing initial values.
+#' 
+#' @importFrom stringr str_sub str_extract
+#' @export
+#' 
+logit <- qlogis
+
+
+#' Logistic function
+#' 
+#' @param x The \code{brms} model fit.
+#' @return a \code{function} containing initial values.
+#' 
+#' @importFrom stringr str_sub str_extract
+#' @export
+#' 
+logistic <- plogis
+
+
 #' Aggregate the tails of a matrix
 #' 
 #' @param M A \code{matrix}.
@@ -81,7 +103,7 @@ aggregate_composition_tails <- function(M, lb = 1, ub) {
 }
 
 
-#' Get initial values.
+#' Get initial values from a previous model fit.
 #' 
 #' @param fit The \code{brms} model fit.
 #' @return a \code{function} containing initial values.
@@ -91,6 +113,25 @@ aggregate_composition_tails <- function(M, lb = 1, ub) {
 #' @export
 #' 
 get_init <- function(fit) {
+  fe <- fixef(fit) %>% 
+    data.frame()
+  init <- as.list(fe$Estimate)
+  names(init) <- rownames(fe)
+  init_fun <- function() init
+  return(init_fun)
+}
+
+
+#' Get initial values from the data.
+#' 
+#' @param fit The \code{brms} model fit.
+#' @return a \code{function} containing initial values.
+#' 
+#' @import dplyr
+#' @importFrom nlme fixef
+#' @export
+#' 
+get_init_data <- function(x) {
   fe <- fixef(fit) %>% 
     data.frame()
   init <- as.list(fe$Estimate)
