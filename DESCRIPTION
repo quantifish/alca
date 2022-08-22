@@ -1,6 +1,6 @@
 Package: alca
 Title: Age and length composition analysis
-Version: 0.0.0
+Version: 1.0.0
 Authors@R: 
     person(given = "Darcy",
            family = "Webber",
